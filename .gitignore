@@ -1,0 +1,67 @@
+# ============================================================
+# Real-Time Fraud Detection Engine — .gitignore
+# ============================================================
+
+# --- Large dataset (150MB) — download separately ---
+# See README.md for download instructions
+creditcard.csv
+
+# --- Trained model artifact (regenerate with: py train_model.py) ---
+fraud_xgboost.joblib
+
+# --- Python cache / build artefacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+lib/
+lib64/
+.installed.cfg
+MANIFEST
+
+# --- Virtual environments ---
+.venv/
+venv/
+ENV/
+env/
+.env.local
+
+# --- Environment variables (keep secrets out of git) ---
+.env
+*.env
+!.env.example
+
+# --- Testing & coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Jupyter Notebooks checkpoints ---
+.ipynb_checkpoints/

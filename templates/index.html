@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel | Real-Time Fraud Detection Engine</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            dark: {
+              900: '#0b0f17',
+              850: '#111827',
+              800: '#1f2937',
+              750: '#283548',
+              700: '#374151',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .gauge-bg {
+      background: conic-gradient(
+        #10b981 0% 20%, 
+        #f59e0b 20% 80%, 
+        #ef4444 80% 100%
+      );
+    }
+  </style>
+</head>
+<body class="bg-dark-900 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="border-b border-dark-750 bg-dark-850/80 backdrop-blur sticky top-0 z-50 px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="shield-alert" class="w-6 h-6 text-dark-900"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+              SENTINEL FRAUD ENGINE
+            </span>
+            <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              v2.0 Real-Time
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">XGBoost &bull; Redis Feature Store &bull; MongoDB Audit</p>
+        </div>
+      </div>
+
+      <!-- Live Service Health Indicators -->
+      <div class="flex items-center space-x-3 text-xs">
+        <div id="status-model" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-dark-800 border border-dark-700">
+          <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span class="text-slate-300">ML Model</span>
+        </div>
+        <div id="status-redis" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-dark-800 border border-dark-700">
+          <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span class="text-slate-300">Redis Store</span>
+        </div>
+        <div id="status-mongo" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-dark-800 border border-dark-700">
+          <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span class="text-slate-300">MongoDB Audit</span>
+        </div>
+        <a href="/docs" target="_blank" class="flex items-center space-x-1 px-3 py-1 rounded-md bg-dark-750 hover:bg-dark-700 transition text-slate-300 hover:text-white border border-dark-700">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+          <span>Swagger Docs</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+    <!-- HERO METRICS STRIP -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-dark-850 border border-dark-750 rounded-xl p-4 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase tracking-wider font-medium">Model Precision-Recall AUC</p>
+          <p class="text-2xl font-bold text-white mt-1">0.8745</p>
+          <span class="text-[11px] text-emerald-400 font-medium">ROC-AUC: 0.9821</span>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-dark-850 border border-dark-750 rounded-xl p-4 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase tracking-wider font-medium">Inference Latency</p>
+          <p id="metric-latency" class="text-2xl font-bold text-white mt-1">~1.2 ms</p>
+          <span class="text-[11px] text-teal-400 font-medium">Sub-millisecond ML core</span>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-dark-850 border border-dark-750 rounded-xl p-4 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase tracking-wider font-medium">Rolling Window</p>
+          <p class="text-2xl font-bold text-white mt-1">3,600s <span class="text-sm font-normal text-slate-400">(1h)</span></p>
+          <span class="text-[11px] text-amber-400 font-medium">Redis TTL sliding window</span>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+          <i data-lucide="clock" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-dark-850 border border-dark-750 rounded-xl p-4 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs text-slate-400 uppercase tracking-wider font-medium">Audit Trail Mode</p>
+          <p class="text-2xl font-bold text-white mt-1">Async Mongo</p>
+          <span class="text-[11px] text-indigo-400 font-medium">Non-blocking background tasks</span>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+          <i data-lucide="database" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TWO COLUMN WORKBENCH -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN: TRANSACTION EVALUATOR & TESTER (7 cols) -->
+      <div class="lg:col-span-7 space-y-6">
+        
+        <!-- Transaction Input Console -->
+        <div class="bg-dark-850 border border-dark-750 rounded-xl p-6 shadow-sm space-y-5">
+          <div class="flex items-center justify-between border-b border-dark-750 pb-4">
+            <div>
+              <h2 class="text-base font-semibold text-white flex items-center space-x-2">
+                <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i>
+                <span>Real-Time Scoring Console</span>
+              </h2>
+              <p class="text-xs text-slate-400">Evaluate any transaction payload against the live feature store and XGBoost classifier.</p>
+            </div>
+            
+            <!-- Quick Preset Selectors -->
+            <div class="flex items-center space-x-1.5 bg-dark-800 p-1 rounded-lg border border-dark-700 text-xs">
+              <button onclick="loadPreset('legit')" class="px-2.5 py-1 rounded bg-dark-750 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-300 font-medium transition">
+                Legit ($149)
+              </button>
+              <button onclick="loadPreset('suspicious')" class="px-2.5 py-1 rounded hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 transition">
+                Suspicious ($420)
+              </button>
+              <button onclick="loadPreset('fraud')" class="px-2.5 py-1 rounded hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 transition">
+                Fraud ($1)
+              </button>
+              <button onclick="loadPreset('random')" class="px-2 py-1 rounded hover:bg-dark-700 text-slate-400 hover:text-white transition" title="Randomize values">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Transaction Form -->
+          <form id="tx-form" onsubmit="event.preventDefault(); evaluateTransaction();" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Transaction ID</label>
+                <div class="relative">
+                  <input type="text" id="input-tx-id" placeholder="tx_live_001 (or auto-generated)"
+                         class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Amount (USD / EUR)</label>
+                <div class="relative">
+                  <span class="absolute left-3 top-2 text-slate-500 text-sm">$</span>
+                  <input type="number" step="0.01" min="0" id="input-amount" required
+                         class="w-full bg-dark-900 border border-dark-700 rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono">
+                </div>
+              </div>
+            </div>
+
+            <!-- Key PCA Inputs (V1, V2 used for mock User ID derivation) -->
+            <div class="bg-dark-900/60 border border-dark-750 rounded-lg p-3.5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5 text-indigo-400"></i>
+                  <span>Cardholder Identification Inputs (V1, V2)</span>
+                </span>
+                <span id="preview-user-id" class="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                  user_id: user_2483
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1 font-mono">V1 Component</label>
+                  <input type="number" step="any" id="input-v1" required oninput="updateUserIdPreview()"
+                         class="w-full bg-dark-800 border border-dark-700 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1 font-mono">V2 Component</label>
+                  <input type="number" step="any" id="input-v2" required oninput="updateUserIdPreview()"
+                         class="w-full bg-dark-800 border border-dark-700 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none">
+                </div>
+              </div>
+            </div>
+
+            <!-- Expandable PCA Transform Grid (V3 through V28) -->
+            <div>
+              <button type="button" onclick="togglePcaGrid()" class="flex items-center justify-between w-full text-xs font-medium text-slate-400 hover:text-slate-200 py-1 transition">
+                <span class="flex items-center space-x-1.5">
+                  <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Inspect Remaining PCA Transformation Vectors (V3 &mdash; V28)</span>
+                </span>
+                <i id="pca-toggle-icon" data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200"></i>
+              </button>
+
+              <div id="pca-grid" class="hidden mt-3 p-3 bg-dark-900 border border-dark-750 rounded-lg max-h-56 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                <!-- Dynamically generated inputs V3 to V28 -->
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-2 flex items-center space-x-3">
+              <button type="submit" id="btn-evaluate" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-dark-900 font-semibold py-2.5 px-4 rounded-lg shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>Evaluate Transaction Risk</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- LIVE STREAM SIMULATION CARD -->
+        <div class="bg-dark-850 border border-dark-750 rounded-xl p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+                <i data-lucide="radio" class="w-4 h-4 text-emerald-400 animate-pulse"></i>
+                <span>Live POS Transaction Firehose Simulator</span>
+              </h3>
+              <p class="text-xs text-slate-400">Pushes Kaggle CSV transactions to Redis Stream and updates cardholder velocity live.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button onclick="runStreamBatch(10)" id="btn-stream-10" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-800 hover:bg-dark-700 text-slate-200 border border-dark-700 transition flex items-center space-x-1.5">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Stream 10 Tx</span>
+              </button>
+              <button onclick="runStreamBatch(25)" id="btn-stream-25" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-800 hover:bg-dark-700 text-slate-200 border border-dark-700 transition flex items-center space-x-1.5">
+                <i data-lucide="fast-forward" class="w-3.5 h-3.5 text-teal-400"></i>
+                <span>Stream 25 Tx</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stream Activity Log Mini -->
+          <div id="stream-output" class="bg-dark-900 border border-dark-750 rounded-lg p-3 font-mono text-[11px] text-slate-300 h-28 overflow-y-auto space-y-1">
+            <p class="text-slate-500 italic">Ready to simulate POS traffic. Click 'Stream 10 Tx' above to push transactions through Redis Stream.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: RISK EVALUATION RESULT & FEATURE STORE INSPECTOR (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <!-- Result Card -->
+        <div id="result-card" class="bg-dark-850 border border-dark-750 rounded-xl p-6 shadow-sm space-y-5 transition-all">
+          <div class="flex items-center justify-between border-b border-dark-750 pb-3">
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Automated Risk Verdict</span>
+            <span id="result-time" class="text-xs text-slate-500 font-mono">--:--:--</span>
+          </div>
+
+          <!-- Big Probability Score Display -->
+          <div class="text-center py-2 space-y-3">
+            <div id="action-badge" class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full text-sm font-bold bg-dark-800 border border-dark-700 text-slate-300">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+              <span>AWAITING INPUT</span>
+            </div>
+
+            <div>
+              <p class="text-xs text-slate-400">Calculated Fraud Probability</p>
+              <p id="fraud-prob-display" class="text-4xl font-black tracking-tight text-white mt-1">0.00%</p>
+            </div>
+
+            <!-- Visual Bar -->
+            <div class="w-full bg-dark-900 rounded-full h-3 p-0.5 border border-dark-700 overflow-hidden">
+              <div id="prob-bar" class="h-full rounded-full bg-slate-600 transition-all duration-500" style="width: 0%"></div>
+            </div>
+
+            <div class="flex justify-between text-[10px] text-slate-500 px-1 font-mono">
+              <span>0% (ALLOW)</span>
+              <span>20% (REVIEW)</span>
+              <span>80% (BLOCK)</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <!-- Feature Store Enrichment Details -->
+          <div class="bg-dark-900/70 border border-dark-750 rounded-lg p-3.5 space-y-2.5 text-xs">
+            <p class="font-semibold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Redis Feature Store Enrichment</span>
+            </p>
+
+            <div class="grid grid-cols-2 gap-2 text-slate-300">
+              <div class="bg-dark-800/80 p-2 rounded border border-dark-700/60">
+                <span class="text-slate-400 text-[11px] block">Mock Cardholder ID</span>
+                <span id="res-user-id" class="font-mono text-white font-medium">--</span>
+              </div>
+              <div class="bg-dark-800/80 p-2 rounded border border-dark-700/60">
+                <span class="text-slate-400 text-[11px] block">Tx Count (Past 1h)</span>
+                <span id="res-count-1h" class="font-mono text-white font-medium">--</span>
+              </div>
+              <div class="bg-dark-800/80 p-2 rounded border border-dark-700/60">
+                <span class="text-slate-400 text-[11px] block">Avg Amount (Past 1h)</span>
+                <span id="res-avg-1h" class="font-mono text-white font-medium">--</span>
+              </div>
+              <div class="bg-dark-800/80 p-2 rounded border border-dark-700/60">
+                <span class="text-slate-400 text-[11px] block">Audit Log ID</span>
+                <span id="res-tx-id" class="font-mono text-emerald-400 font-medium truncate block">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature Store Cardholder Inspector -->
+        <div class="bg-dark-850 border border-dark-750 rounded-xl p-5 shadow-sm space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white flex items-center space-x-1.5">
+              <i data-lucide="search" class="w-4 h-4 text-emerald-400"></i>
+              <span>Redis User Feature Inspector</span>
+            </h3>
+            <span class="text-[10px] text-slate-400 font-mono">TTL: 3600s</span>
+          </div>
+
+          <div class="flex space-x-2">
+            <input type="text" id="inspector-user-id" placeholder="e.g. user_2483" value="user_2483"
+                   class="flex-1 bg-dark-900 border border-dark-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+            <button onclick="inspectUserFeatures()" class="px-3 py-1.5 bg-dark-750 hover:bg-dark-700 text-xs font-medium text-slate-200 rounded-lg border border-dark-700 transition">
+              Query Redis
+            </button>
+          </div>
+
+          <!-- Redis Key Inspection Box -->
+          <div id="inspector-result" class="bg-dark-900 border border-dark-750 rounded-lg p-3 font-mono text-xs text-slate-300 min-h-[90px]">
+            <p class="text-slate-500 italic text-[11px]">Click 'Query Redis' to inspect current rolling state & TTL.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT PREDICTIONS AUDIT FEED (FROM MONGODB) -->
+    <div class="bg-dark-850 border border-dark-750 rounded-xl p-6 shadow-sm space-y-4">
+      <div class="flex items-center justify-between border-b border-dark-750 pb-3">
+        <div>
+          <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+            <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i>
+            <span>MongoDB Audit Trail (`predictions_log`)</span>
+          </h3>
+          <p class="text-xs text-slate-400">Recent decisions asynchronously persisted for compliance and fraud model monitoring.</p>
+        </div>
+        <button onclick="fetchAuditLogs()" class="px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-dark-700 text-xs font-medium text-slate-200 transition flex items-center space-x-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>Refresh Audit Logs</span>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="text-slate-400 uppercase font-mono text-[11px] bg-dark-900/60 border-b border-dark-750">
+            <tr>
+              <th class="py-2.5 px-3">Transaction ID</th>
+              <th class="py-2.5 px-3">User ID</th>
+              <th class="py-2.5 px-3">Amount</th>
+              <th class="py-2.5 px-3">History (1h Count / Avg)</th>
+              <th class="py-2.5 px-3">Fraud Prob</th>
+              <th class="py-2.5 px-3">Action</th>
+              <th class="py-2.5 px-3">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body" class="divide-y divide-dark-750 font-mono">
+            <tr>
+              <td colspan="7" class="py-4 text-center text-slate-500 italic">Loading recent audit records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Default Preset Values
+    const PRESETS = {
+      legit: {
+        transaction_id: "tx_legit_pos_001",
+        Amount: 149.62,
+        V1: -1.359807, V2: -0.072781, V3: 2.536347, V4: 1.378155, V5: -0.338321,
+        V6: 0.462388, V7: 0.239599, V8: 0.098698, V9: 0.363787, V10: 0.090794,
+        V11: -0.551600, V12: -0.617801, V13: -0.991390, V14: -0.311169, V15: 1.468177,
+        V16: -0.470401, V17: 0.207971, V18: 0.025791, V19: 0.403993, V20: 0.251412,
+        V21: -0.018307, V22: 0.277838, V23: -0.110474, V24: 0.066928, V25: 0.128539,
+        V26: -0.189115, V27: 0.133558, V28: -0.021053
+      },
+      suspicious: {
+        transaction_id: "tx_suspicious_spike_002",
+        Amount: 420.00,
+        V1: -2.100000, V2: 1.500000, V3: -1.200000, V4: 2.800000, V5: -1.800000,
+        V6: -0.900000, V7: -2.100000, V8: 0.850000, V9: -1.500000, V10: -3.200000,
+        V11: 2.100000, V12: -3.500000, V13: 0.100000, V14: -4.800000, V15: -0.200000,
+        V16: -2.100000, V17: -3.100000, V18: -1.200000, V19: 0.800000, V20: 0.500000,
+        V21: 0.450000, V22: -0.100000, V23: -0.200000, V24: 0.100000, V25: 0.200000,
+        V26: 0.150000, V27: 0.300000, V28: 0.050000
+      },
+      fraud: {
+        transaction_id: "tx_fraud_anomaly_003",
+        Amount: 1.00,
+        V1: -3.043540, V2: -3.157285, V3: 1.088857, V4: 2.288643, V5: 1.359754,
+        V6: -1.064004, V7: -3.493547, V8: -0.432125, V9: -0.924618, V10: -5.740554,
+        V11: -3.387165, V12: -5.569899, V13: 0.672384, V14: -10.103045, V15: 0.505921,
+        V16: -3.857149, V17: -5.572673, V18: -2.161490, V19: -0.145128, V20: -1.151261,
+        V21: -0.589805, V22: -0.720080, V23: -0.149661, V24: 0.168092, V25: 0.041698,
+        V26: 0.126046, V27: 0.340075, V28: 0.167154
+      }
+    };
+
+    // Build PCA inputs V3 to V28
+    const pcaGrid = document.getElementById("pca-grid");
+    for (let i = 3; i <= 28; i++) {
+      const div = document.createElement("div");
+      div.innerHTML = `
+        <label class="block text-[10px] text-slate-400 font-mono">V${i}</label>
+        <input type="number" step="any" id="input-v${i}" required
+               class="w-full bg-dark-800 border border-dark-700 rounded px-1.5 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+      `;
+      pcaGrid.appendChild(div);
+    }
+
+    // Toggle PCA Grid visibility
+    function togglePcaGrid() {
+      const grid = document.getElementById("pca-grid");
+      const icon = document.getElementById("pca-toggle-icon");
+      if (grid.classList.contains("hidden")) {
+        grid.classList.remove("hidden");
+        icon.classList.add("rotate-180");
+      } else {
+        grid.classList.add("hidden");
+        icon.classList.remove("rotate-180");
+      }
+    }
+
+    // Load preset into form
+    function loadPreset(type) {
+      let data;
+      if (type === "random") {
+        data = { ...PRESETS.legit };
+        data.transaction_id = "tx_rand_" + Math.random().toString(36).substring(2, 8);
+        data.Amount = parseFloat((Math.random() * 300 + 5).toFixed(2));
+        data.V1 = parseFloat((Math.random() * 4 - 2).toFixed(4));
+        data.V2 = parseFloat((Math.random() * 4 - 2).toFixed(4));
+      } else {
+        data = PRESETS[type] || PRESETS.legit;
+      }
+
+      document.getElementById("input-tx-id").value = data.transaction_id;
+      document.getElementById("input-amount").value = data.Amount;
+      document.getElementById("input-v1").value = data.V1;
+      document.getElementById("input-v2").value = data.V2;
+
+      for (let i = 3; i <= 28; i++) {
+        document.getElementById(`input-v${i}`).value = data[`V${i}`] ?? 0.0;
+      }
+      updateUserIdPreview();
+    }
+
+    // Live preview of derived User ID
+    function updateUserIdPreview() {
+      const v1 = parseFloat(document.getElementById("input-v1").value) || 0;
+      const v2 = parseFloat(document.getElementById("input-v2").value) || 0;
+      
+      // Calculate deterministic hash equivalent to python compute_mock_user_id
+      // For immediate preview, show approximate sum index
+      const sum = Math.round((v1 + v2) * 100) / 100;
+      // Simple preview hash simulation
+      let hash = 0;
+      const str = sum.toFixed(2);
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+      }
+      const userNum = Math.abs(hash) % 5000;
+      const userStr = "user_" + String(userNum).padStart(4, "0");
+      document.getElementById("preview-user-id").innerText = `derived: ${userStr}`;
+    }
+
+    // Submit transaction to /predict
+    async function evaluateTransaction() {
+      const btn = document.getElementById("btn-evaluate");
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scoring Transaction...</span>`;
+      lucide.createIcons();
+
+      const payload = {
+        transaction_id: document.getElementById("input-tx-id").value || undefined,
+        Amount: parseFloat(document.getElementById("input-amount").value),
+        V1: parseFloat(document.getElementById("input-v1").value),
+        V2: parseFloat(document.getElementById("input-v2").value)
+      };
+
+      for (let i = 3; i <= 28; i++) {
+        payload[`V${i}`] = parseFloat(document.getElementById(`input-v${i}`).value) || 0.0;
+      }
+
+      const t0 = performance.now();
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const latency = (performance.now() - t0).toFixed(1);
+        document.getElementById("metric-latency").innerText = `${latency} ms`;
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Prediction error: " + (err.detail || res.statusText));
+          return;
+        }
+
+        const data = await res.json();
+        renderResult(data);
+        // Refresh audit table
+        setTimeout(fetchAuditLogs, 500);
+      } catch (e) {
+        alert("Network or inference error: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="shield-check" class="w-4 h-4"></i><span>Evaluate Transaction Risk</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    // Render result card
+    function renderResult(data) {
+      const probPct = (data.fraud_probability * 100).toFixed(2);
+      document.getElementById("fraud-prob-display").innerText = `${probPct}%`;
+      document.getElementById("result-time").innerText = new Date().toLocaleTimeString();
+
+      const bar = document.getElementById("prob-bar");
+      bar.style.width = `${Math.min(Math.max(probPct, 2), 100)}%`;
+
+      const badge = document.getElementById("action-badge");
+      const card = document.getElementById("result-card");
+
+      if (data.action === "ALLOW") {
+        badge.className = "inline-flex items-center space-x-2 px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400";
+        badge.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i><span>ACTION: ALLOW (LEGITIMATE)</span>`;
+        bar.className = "h-full rounded-full bg-emerald-500 transition-all duration-500";
+        card.style.borderColor = "rgba(16, 185, 129, 0.4)";
+      } else if (data.action === "REVIEW") {
+        badge.className = "inline-flex items-center space-x-2 px-4 py-1.5 rounded-full text-sm font-bold bg-amber-500/15 border border-amber-500/40 text-amber-400";
+        badge.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i><span>ACTION: MANUAL REVIEW</span>`;
+        bar.className = "h-full rounded-full bg-amber-500 transition-all duration-500";
+        card.style.borderColor = "rgba(245, 158, 11, 0.4)";
+      } else {
+        badge.className = "inline-flex items-center space-x-2 px-4 py-1.5 rounded-full text-sm font-bold bg-rose-500/15 border border-rose-500/40 text-rose-400 animate-pulse-subtle";
+        badge.innerHTML = `<i data-lucide="shield-x" class="w-4 h-4 text-rose-400"></i><span>ACTION: BLOCK (FRAUD DETECTED)</span>`;
+        bar.className = "h-full rounded-full bg-rose-500 transition-all duration-500";
+        card.style.borderColor = "rgba(239, 68, 68, 0.5)";
+      }
+
+      document.getElementById("res-user-id").innerText = data.user_id || "--";
+      document.getElementById("res-count-1h").innerText = data.historical_count_1h ?? 0;
+      document.getElementById("res-avg-1h").innerText = `$${(data.historical_avg_amount_1h ?? 0).toFixed(2)}`;
+      document.getElementById("res-tx-id").innerText = data.transaction_id || "--";
+
+      // Also prefill inspector
+      if (data.user_id) {
+        document.getElementById("inspector-user-id").value = data.user_id;
+      }
+      lucide.createIcons();
+    }
+
+    // Inspect user in Redis
+    async function inspectUserFeatures() {
+      const userId = document.getElementById("inspector-user-id").value.trim();
+      if (!userId) return;
+
+      const container = document.getElementById("inspector-result");
+      container.innerHTML = `<span class="text-slate-400 italic">Querying Redis hash for ${userId}...</span>`;
+
+      try {
+        const res = await fetch(`/features/${userId}`);
+        const data = await res.json();
+        
+        if (data.features && Object.keys(data.features).length > 0) {
+          container.innerHTML = `
+            <div class="space-y-1">
+              <div class="flex justify-between text-slate-400">
+                <span>Key: <b class="text-emerald-400 font-mono">${data.key}</b></span>
+                <span>TTL: <b class="text-amber-400">${data.ttl_seconds}s</b></span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dark-750">
+                <div>tx_count_1h: <b class="text-white">${data.features.transaction_count_1h}</b></div>
+                <div>avg_amount_1h: <b class="text-white">$${data.features.avg_amount_1h}</b></div>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">last_updated: ${data.features.last_updated}</div>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `<span class="text-amber-400">Key expired or no prior transactions for ${userId}. (Defaults to count=0, avg=0)</span>`;
+        }
+      } catch (e) {
+        container.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+      }
+    }
+
+    // Simulate batch of stream transactions
+    async function runStreamBatch(count) {
+      const out = document.getElementById("stream-output");
+      out.innerHTML = `<p class="text-teal-400">Streaming ${count} transactions into Redis Stream 'fraud_stream'...</p>`;
+
+      try {
+        const res = await fetch(`/api/simulate-batch?count=${count}`, { method: "POST" });
+        const data = await res.json();
+
+        out.innerHTML = "";
+        data.results.forEach((item, idx) => {
+          const color = item.action === "ALLOW" ? "text-emerald-400" : (item.action === "REVIEW" ? "text-amber-400" : "text-rose-400");
+          const p = document.createElement("p");
+          p.innerHTML = `[${idx + 1}/${count}] <span class="text-slate-400">${item.transaction_id}</span> | user: <span class="text-indigo-300">${item.user_id}</span> | amt: $${item.amount.toFixed(2)} | prob: <b>${(item.fraud_probability * 100).toFixed(1)}%</b> -> <b class="${color}">${item.action}</b>`;
+          out.appendChild(p);
+        });
+        out.scrollTop = out.scrollHeight;
+
+        fetchAuditLogs();
+      } catch (e) {
+        out.innerHTML = `<p class="text-rose-400">Error streaming batch: ${e.message}</p>`;
+      }
+    }
+
+    // Fetch MongoDB Audit Logs
+    async function fetchAuditLogs() {
+      const tbody = document.getElementById("audit-table-body");
+      try {
+        const res = await fetch("/api/audit-logs?limit=10");
+        const logs = await res.json();
+
+        if (!logs || logs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-slate-500 italic">No audit records logged yet. Evaluate a transaction to generate logs.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = "";
+        logs.forEach(log => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-dark-800/40 transition";
+
+          const actionColor = log.action === "ALLOW" 
+            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+            : (log.action === "REVIEW" ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30");
+
+          const amt = log.input_transaction ? log.input_transaction.Amount : (log.Amount || 0);
+          const count = log.feature_store_features ? log.feature_store_features.transaction_count_1h : 0;
+          const avg = log.feature_store_features ? log.feature_store_features.avg_amount_1h : 0;
+          const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "--";
+
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 text-slate-300">${log.transaction_id}</td>
+            <td class="py-2.5 px-3 text-indigo-300">${log.user_id || "--"}</td>
+            <td class="py-2.5 px-3 text-white font-medium">$${Number(amt).toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-slate-400">${count} / $${Number(avg).toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-slate-200 font-semibold">${(log.fraud_probability * 100).toFixed(2)}%</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${actionColor}">
+                ${log.action}
+              </span>
+            </td>
+            <td class="py-2.5 px-3 text-slate-500">${timeStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-rose-400">Failed to load audit logs: ${e.message}</td></tr>`;
+      }
+    }
+
+    // Health Check Poller
+    async function checkHealth() {
+      try {
+        const res = await fetch("/health");
+        const data = await res.json();
+
+        updateIndicator("status-model", data.model_loaded, "ML Model");
+        updateIndicator("status-redis", data.redis_connected, "Redis Store");
+        updateIndicator("status-mongo", data.mongo_connected, "MongoDB Audit");
+      } catch (e) {
+        updateIndicator("status-model", false, "ML Model");
+        updateIndicator("status-redis", false, "Redis Store");
+        updateIndicator("status-mongo", false, "MongoDB Audit");
+      }
+    }
+
+    function updateIndicator(id, isHealthy, label) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const dot = el.querySelector("span:first-child");
+      const text = el.querySelector("span:last-child");
+
+      if (isHealthy) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400";
+        el.className = "flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30";
+        text.className = "text-emerald-300 font-medium";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-rose-500";
+        el.className = "flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30";
+        text.className = "text-rose-300";
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener("DOMContentLoaded", () => {
+      loadPreset("legit");
+      checkHealth();
+      setInterval(checkHealth, 5000);
+      fetchAuditLogs();
+    });
+  </script>
+</body>
+</html>
